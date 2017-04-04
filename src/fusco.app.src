@@ -8,6 +8,9 @@
   {modules, []},
   {registered, []},
   {applications, [kernel, stdlib, ssl]},
-  {env, []}
+  {env, []},
+  {licenses, ["Apache 2.0"]},
+  {links, [{"Github", "https://github.com/esl/fusco"}]},
+  {build_tools, ["rebar3"]}
  ]}.
 
