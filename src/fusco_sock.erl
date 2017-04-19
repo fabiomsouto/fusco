@@ -11,8 +11,8 @@
 
 -export([connect/5,
          recv/2,
-	 recv/3,
-	 send/3,
+         recv/3,
+         send/3,
          close/2,
          setopts/3]).
 
@@ -23,7 +23,8 @@
 %%==============================================================================
 
 %%------------------------------------------------------------------------------
-%% @spec (Host, Port, Options, Timeout, SslFlag) -> {ok, Socket} | {error, Reason}
+%% @spec (Host, Port, Options, Timeout, SslFlag) -> {ok, Socket} |
+%%                                                  {error, Reason}
 %%   Host = string() | ip_address()
 %%   Port = integer()
 %%   Options = [{atom(), term()} | atom()]

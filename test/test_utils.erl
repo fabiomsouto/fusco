@@ -8,31 +8,37 @@
 -copyright("2013, Erlang Solutions Ltd.").
 
 -export([start_listener/1,
-	 start_listener/2,
-	 send_message/1,
-	 stop_listener/1]).
+         start_listener/2,
+         send_message/1,
+         stop_listener/1]).
 
 start_listener(Msg) ->
     start_listener(Msg, close).
 
 start_listener({fragmented, Msg}, ConnectionState) ->
-    random:seed(erlang:now()),
+    _ = rand:seed(erlang:timestamp()),
     start_listener(Msg, fun fragmented_user_response/1, ConnectionState);
 start_listener(Msg, ConnectionState) ->
     start_listener(Msg, fun user_response/1, ConnectionState).
 
 start_listener(Msg, Fun, ConnectionState) ->
-    Responders = case ConnectionState of
-		     close ->
-			 [Fun(Msg)];
-		     keepalive ->
-			 [Fun(Msg), user_response(message())]
-		 end,
+    Responders =
+        case ConnectionState of
+            close ->
+                [Fun(Msg)];
+            keepalive ->
+                [Fun(Msg), user_response(message())]
+         end,
     {ok, Listener, LS, Port} = webserver:start(gen_tcp, Responders),
-    {ok, Socket} = gen_tcp:connect("127.0.0.1", Port, [binary, {packet, raw},
-						       {nodelay, true},
-						       {reuseaddr, true},
-						       {active, false}], 5000),
+    {ok, Socket} =
+        gen_tcp:connect("127.0.0.1",
+                        Port,
+                        [binary,
+                         {packet, raw},
+                         {nodelay, true},
+                         {reuseaddr, true},
+                         {active, false}],
+                        5000),
     {Listener, LS, Socket}.
 
 send_message(Socket) ->
@@ -48,25 +54,27 @@ send_fragmented_message(Module, Socket, Msg) ->
     R = random(Length),
     Bin = binary:part(Msg, 0, R),
     Module:send(Socket, Bin),
-    send_fragmented_message(Module, Socket, binary:part(Msg, R, erlang:byte_size(Msg) - R)).
+    send_fragmented_message(Module, Socket, binary:part(Msg, R,
+                            erlang:byte_size(Msg) - R)).
 
 random(Length) when Length =< 5 ->
-    random:uniform(Length);
+    rand:uniform(Length);
 random(_Length) ->
-    random:uniform(5).
+    rand:uniform(5).
 
 user_response(Message) ->
     fun(Module, Socket, _, _, _) ->
-	    Module:send(Socket, Message)
+        Module:send(Socket, Message)
     end.
 
 fragmented_user_response(Message) ->
     fun(Module, Socket, _, _, _) ->
-	    send_fragmented_message(Module, Socket, Message)
+        send_fragmented_message(Module, Socket, Message)
     end.
 
 message() ->
-    <<"GET /blabla HTTP/1.1\r\nhost: 127.0.0.1:5050\r\nuser-agent: Cow\r\nAccept: */*\r\n\r\n">>.
+    <<"GET /blabla HTTP/1.1\r\nhost: 127.0.0.1:5050\r\nuser-agent: Cow\r\n",
+      "Accept: */*\r\n\r\n">>.
 
 stop_listener({Listener, LS, Socket}) ->
     webserver:stop(Listener, LS),

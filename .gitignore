@@ -8,6 +8,7 @@ util/*.beam
 cover_report/
 test/*.beam
 test/*.log
+log*/
 
 .eunit
 
@@ -18,3 +19,5 @@ test/*.log
 erl_crash.dump
 
 .DS_Store
+
+_build/
