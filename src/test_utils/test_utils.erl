@@ -14,9 +14,8 @@
 
 start_listener(Msg) ->
     start_listener(Msg, close).
-
 start_listener({fragmented, Msg}, ConnectionState) ->
-    _ = rand:seed(erlang:timestamp()),
+    _ = rand:seed(exsplus, erlang:timestamp()),
     start_listener(Msg, fun fragmented_user_response/1, ConnectionState);
 start_listener(Msg, ConnectionState) ->
     start_listener(Msg, fun user_response/1, ConnectionState).

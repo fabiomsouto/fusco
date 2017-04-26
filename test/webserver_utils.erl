@@ -1,6 +1,16 @@
 -module(webserver_utils).
 
--compile(export_all).
+-export([default_string/0,
+         empty_body/5,
+         copy_body_100_continue/5,
+         pre_1_1_server/5,
+         pre_1_1_server_keep_alive/5,
+         very_slow_response/5,
+         no_content_length/5,
+         no_content_length_1_0/5,
+         trailing_space_header/5,
+         no_response/5]).
+
 
 -define(DEFAULT_STRING, "Great success!").
 

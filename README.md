@@ -96,3 +96,10 @@ list of all available options, please check OTP's ssl module manpage.
 disconnect(Client :: pid())
 ``` 
 
+Running Tests
+----
+You can execute all test with
+```bash
+> make test
+```
+And you can check [this repo](https://github.com/esl/fusco_eqc) and run the Erlang QuickCheck tests
