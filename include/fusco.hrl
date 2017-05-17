@@ -38,10 +38,10 @@
           value :: binary(),
           expires :: {{integer(), integer(), integer()},
                       {integer(), integer(), integer()}} | atom(),
-          path :: binary(),
-          path_tokens :: [binary()],
+          path :: binary() | undefined,
+          path_tokens :: [binary()] | undefined,
           max_age :: integer() | atom(),
-          domain :: binary()
+          domain :: binary() | undefined
          }).
 
 -record(response, {socket,

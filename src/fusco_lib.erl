@@ -27,6 +27,9 @@
 
 -define(HTTP_LINE_END, <<"\r\n">>).
 
+-type fusco_url() :: #fusco_url{}.
+-type fusco_cookie() :: #fusco_cookie{}.
+
 %%==============================================================================
 %% Exported functions
 %%==============================================================================
@@ -42,23 +45,23 @@
 %% check the match.
 %% @end
 %%------------------------------------------------------------------------------
--spec header_value(string(), headers()) -> undefined | term().
+-spec header_value(string() | binary(), headers()) -> undefined | term().
 header_value(Hdr, Hdrs) ->
     %% TODO ensure headers and values are stripped
     case lists:keyfind(Hdr, 1, Hdrs) of
-	false ->
-	    undefined;
-	{Hdr, Value} ->
-	    Value
+        false ->
+            undefined;
+        {Hdr, Value} ->
+            Value
     end.
 
 %%------------------------------------------------------------------------------
-%% @spec (URL) -> #fusco_url{}
+%% @spec (URL) -> fusco_url()
 %%   URL = string()
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
--spec parse_url(string()) -> #fusco_url{}.
+-spec parse_url(string()) -> fusco_url().
 parse_url(URL) ->
     % XXX This should be possible to do with the re module?
     {Scheme, CredsHostPortPath} = split_scheme(URL),
@@ -76,24 +79,24 @@ parse_url(URL) ->
 %% Headers = [{atom() | string(), string()}]
 %% Host = string()
 %% Body = iolist()
-%% Cookies = [#fusco_cookie{}]
+%% Cookies = [fusco_cookie()]
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
 -spec format_request(iolist(), method(), headers(), string(),  iolist(),
-                     {boolean(), [#fusco_cookie{}]}) -> {iodata(), iodata()}.
+                     {boolean(), [fusco_cookie()]}) -> {iodata(), iodata()}.
 format_request(Path, Method, Hdrs, Host, Body, Cookies) ->
     {AllHdrs, ConHdr} =
-	add_mandatory_hdrs(Path, Hdrs, Host, Body, Cookies),
+        add_mandatory_hdrs(Path, Hdrs, Host, Body, Cookies),
     {[Method, <<" ">>, Path, <<" HTTP/1.1">>, ?HTTP_LINE_END, AllHdrs,
-      ?HTTP_LINE_END, Body], ConHdr}.
+     ?HTTP_LINE_END, Body], ConHdr}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %% @doc Updated the state of the cookies. after we receive a response.
 %% @end
 %%------------------------------------------------------------------------------
--spec update_cookies(headers(), [#fusco_cookie{}]) -> [#fusco_cookie{}].
+-spec update_cookies(headers(), [fusco_cookie()]) -> [fusco_cookie()].
 update_cookies([], []) ->
     [];
 update_cookies([], StateCookies) ->
@@ -160,10 +163,10 @@ is_close(<<C, Rest1/bits>>, [C | Rest2]) ->
     is_close(Rest1, Rest2);
 is_close(<<C1, Rest1/bits>>, [C2 | Rest2]) ->
     case close_to_lower(C1) == C2 of
-	true ->
-	    is_close(Rest1, Rest2);
-	false ->
-	    false
+        true ->
+            is_close(Rest1, Rest2);
+        false ->
+            false
     end;
 is_close(<<>>, _) ->
     false;
@@ -192,10 +195,10 @@ close_to_lower(C) ->
       List :: [term()].
 get_value(Key, List) ->
     case lists:keyfind(Key, 1, List) of
-	{Key, Value} ->
-	    Value;
-	false ->
-	    undefined
+        {Key, Value} ->
+            Value;
+        false ->
+            undefined
     end.
 
 %%------------------------------------------------------------------------------
@@ -208,10 +211,10 @@ get_value(Key, List) ->
       Default :: term().
 get_value(Key, List, Default) ->
     case lists:keyfind(Key, 1, List) of
-	{Key, Value} ->
-	    Value;
-	false ->
-	    Default
+        {Key, Value} ->
+            Value;
+        false ->
+            Default
     end.
 
 %%------------------------------------------------------------------------------
@@ -219,7 +222,8 @@ get_value(Key, List, Default) ->
 %% @doc Delete the cookies that are expired (check max-age and expire fields).
 %% @end
 %%------------------------------------------------------------------------------
--spec delete_expired_cookies([#fusco_cookie{}], erlang:timestamp()) -> [#fusco_cookie{}].
+-spec delete_expired_cookies([fusco_cookie()], erlang:timestamp()) ->
+    [fusco_cookie()].
 delete_expired_cookies([], _InTimestamp) ->
     [];
 delete_expired_cookies(Cookies, InTimestamp) ->
@@ -263,15 +267,16 @@ split_credentials(CredsHostPortPath) ->
         [Creds, HostPortPath] ->
             % RFC1738 (section 3.1) says:
             % "The user name (and password), if present, are followed by a
-            % commercial at-sign "@". Within the user and password field, any ":",
-            % "@", or "/" must be encoded."
+            % commercial at-sign "@". Within the user and password field,
+            % any ":", "@", or "/" must be encoded."
             % The mentioned encoding is the "percent" encoding.
             case string:tokens(Creds, ":") of
                 [User] ->
                     % RFC1738 says ":password" is optional
                     {http_uri:decode(User), "", HostPortPath};
                 [User, Passwd] ->
-                    {http_uri:decode(User), http_uri:decode(Passwd), HostPortPath}
+                    {http_uri:decode(User), http_uri:decode(Passwd),
+                     HostPortPath}
             end
     end.
 
@@ -335,30 +340,31 @@ split_port(Scheme, [P | T], Port) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec add_mandatory_hdrs(string(), headers(), host(),
-                         iolist(), {boolean(), [#fusco_cookie{}]}) -> {iodata(), iodata()}.
+                         iolist(), {boolean(), [fusco_cookie()]}) ->
+    {iodata(), iodata()}.
 add_mandatory_hdrs(_Path, Hdrs, Host, Body, {_, []}) ->
     add_headers(Hdrs, Body, Host, undefined, []);
 add_mandatory_hdrs(_Path, Hdrs, Host, Body, {false, _}) ->
     add_headers(Hdrs, Body, Host, undefined, []);
 add_mandatory_hdrs(Path, Hdrs, Host, Body, {true, Cookies}) ->
     Result = {ContentHdrs, ConHdr} =
-	add_headers(Hdrs, Body, Host, undefined, []),
+        add_headers(Hdrs, Body, Host, undefined, []),
 
     %% http://tools.ietf.org/search/rfc6265#section-4.1.2.4
     %% only include cookies if the cookie path is a prefix of the request path
     %% TODO optimize cookie handling
     case lists:filter(
-	   fun(#fusco_cookie{path_tokens = undefined}) ->
-		   true;
-	      (#fusco_cookie{path_tokens = CookiePath}) ->
+       fun(#fusco_cookie{path_tokens = undefined}) ->
+           true;
+          (#fusco_cookie{path_tokens = CookiePath}) ->
                SubPath = binary:split(Path, <<"/">>, [global]),
                is_prefix(CookiePath, SubPath)
        end, Cookies)
     of
-	[] ->
-	    Result;
-	IncludeCookies ->
-	    {add_cookie_headers(ContentHdrs, IncludeCookies), ConHdr}
+        [] ->
+            Result;
+        IncludeCookies ->
+            {add_cookie_headers(ContentHdrs, IncludeCookies), ConHdr}
     end.
 
 %%------------------------------------------------------------------------------
@@ -392,38 +398,38 @@ cookie_string(#fusco_cookie{name = Name, value = Value}) ->
 add_headers([{H, V} | T], undefined, undefined, Connection, Acc)
   when Connection =/= undefined ->
     add_headers(T, undefined, undefined, Connection,
-		[[H, <<": ">>, V, ?HTTP_LINE_END] | Acc]);
+        [[H, <<": ">>, V, ?HTTP_LINE_END] | Acc]);
 add_headers([{H, V} | T], Body, Host, Connection, Acc) ->
     case bin_to_lower(H) of
-	<<"connection">> ->
-	    add_headers(T, Body, Host, V,
-			[[H, <<": ">>, V, ?HTTP_LINE_END] | Acc]);
-	<<"host">> ->
-	    add_headers(T, Body, undefined, Connection,
-			[[H, <<": ">>, V, ?HTTP_LINE_END] | Acc]);
-	<<"content-length">> ->
-	    add_headers(T, undefined, Host, Connection,
-			[[H, <<": ">>, V, ?HTTP_LINE_END] | Acc]);
-	_ ->
-	    add_headers(T, Body, Host, Connection,
-			[[H, <<": ">>, V, ?HTTP_LINE_END] | Acc])
+        <<"connection">> ->
+            add_headers(T, Body, Host, V,
+                [[H, <<": ">>, V, ?HTTP_LINE_END] | Acc]);
+        <<"host">> ->
+            add_headers(T, Body, undefined, Connection,
+                [[H, <<": ">>, V, ?HTTP_LINE_END] | Acc]);
+        <<"content-length">> ->
+            add_headers(T, undefined, Host, Connection,
+                [[H, <<": ">>, V, ?HTTP_LINE_END] | Acc]);
+        _ ->
+            add_headers(T, Body, Host, Connection,
+                [[H, <<": ">>, V, ?HTTP_LINE_END] | Acc])
     end;
 add_headers([], undefined, Host, Connection, Headers) ->
     case Host of
-	undefined ->
-	    {Headers, Connection};
-	_ ->
-	    {[[<<"Host: ">>, Host, ?HTTP_LINE_END] | Headers], Connection}
+        undefined ->
+            {Headers, Connection};
+        _ ->
+            {[[<<"Host: ">>, Host, ?HTTP_LINE_END] | Headers], Connection}
     end;
 add_headers([], Body, Host, Connection, Headers) ->
     ContentLength = integer_to_list(iolist_size(Body)),
     case ContentLength > 0 of
-	true ->
-	    add_headers([], undefined, Host, Connection, 
-			[[<<"Content-Length: ">>, ContentLength, ?HTTP_LINE_END]
-			 | Headers]);
-	_ ->
-	    add_headers([], undefined, Host, Connection, Headers)
+        true ->
+            add_headers([], undefined, Host, Connection,
+                [[<<"Content-Length: ">>, ContentLength, ?HTTP_LINE_END]
+                 | Headers]);
+        _ ->
+            add_headers([], undefined, Host, Connection, Headers)
     end.
 
 %%------------------------------------------------------------------------------
@@ -435,7 +441,8 @@ host_header(Host, 80)   -> maybe_ipv6_enclose(Host);
 % When proxying after an HTTP CONNECT session is established, squid doesn't
 % like the :443 suffix in the Host header.
 host_header(Host, 443)  -> maybe_ipv6_enclose(Host);
-host_header(Host, Port) -> [maybe_ipv6_enclose(Host), $:, integer_to_list(Port)].
+host_header(Host, Port) ->
+    [maybe_ipv6_enclose(Host), $:, integer_to_list(Port)].
 
 %%------------------------------------------------------------------------------
 %% @private

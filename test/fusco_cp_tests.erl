@@ -54,4 +54,3 @@ unblock_client() ->
                                        {client, _} = R ->
                                            R
                                    end).
-    

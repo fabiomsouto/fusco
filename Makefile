@@ -2,7 +2,7 @@
 
 PROJECT = fusco
 
-REBAR := ./rebar
+REBAR := rebar3
 DIALYZER = dialyzer
 
 APPS = kernel stdlib sasl inets ssl public_key crypto compiler
@@ -13,12 +13,12 @@ compile:
 	$(REBAR) compile
 
 doc:
-	$(REBAR) doc
+	$(REBAR) edoc
 
 test:	compile
 	$(REBAR) eunit ct
 
-release: all dialyze test
+release: all dialyzer test
 	$(REBAR) release
 
 clean:

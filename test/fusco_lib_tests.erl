@@ -94,26 +94,28 @@ parse_url_test_() ->
                         },
                       fusco_lib:parse_url("http://host:180/foo/bar")),
 
-        ?_assertEqual(#fusco_url{
-                         host = "host",
-                         port = 180,
-                         path = "/foo/bar",
-                         is_ssl = false,
-                         user = "joe",
-                         password = "erlang"
-                        },
-                      fusco_lib:parse_url("http://joe:erlang@host:180/foo/bar")),
+        ?_assertEqual(
+            #fusco_url{
+                 host = "host",
+                 port = 180,
+                 path = "/foo/bar",
+                 is_ssl = false,
+                 user = "joe",
+                 password = "erlang"
+                },
+            fusco_lib:parse_url("http://joe:erlang@host:180/foo/bar")),
 
 
-        ?_assertEqual(#fusco_url{
-                         host = "host",
-                         port = 180,
-                         path = "/foo/bar",
-                         is_ssl = false,
-                         user = "joe",
-                         password = "erl@ng"
-                        },
-                      fusco_lib:parse_url("http://joe:erl%40ng@host:180/foo/bar")),
+        ?_assertEqual(
+            #fusco_url{
+                 host = "host",
+                 port = 180,
+                 path = "/foo/bar",
+                 is_ssl = false,
+                 user = "joe",
+                 password = "erl@ng"
+                },
+            fusco_lib:parse_url("http://joe:erl%40ng@host:180/foo/bar")),
 
         ?_assertEqual(#fusco_url{
                          host = "host",
@@ -135,25 +137,28 @@ parse_url_test_() ->
                         },
                       fusco_lib:parse_url("http://@host:180/foo/bar")),
 
-        ?_assertEqual(#fusco_url{
-                         host = "host",
-                         port = 180,
-                         path = "/foo/bar",
-                         is_ssl = false,
-                         user = "joe:arm",
-                         password = "erlang"
-                        },
-                      fusco_lib:parse_url("http://joe%3Aarm:erlang@host:180/foo/bar")),
+        ?_assertEqual(
+            #fusco_url{
+                 host = "host",
+                 port = 180,
+                 path = "/foo/bar",
+                 is_ssl = false,
+                 user = "joe:arm",
+                 password = "erlang"
+                },
+            fusco_lib:parse_url("http://joe%3Aarm:erlang@host:180/foo/bar")),
 
-        ?_assertEqual(#fusco_url{
-                         host = "host",
-                         port = 180,
-                         path = "/foo/bar",
-                         is_ssl = false,
-                         user = "joe:arm",
-                         password = "erlang/otp"
-                        },
-                      fusco_lib:parse_url("http://joe%3aarm:erlang%2Fotp@host:180/foo/bar")),
+        ?_assertEqual(
+            #fusco_url{
+                 host = "host",
+                 port = 180,
+                 path = "/foo/bar",
+                 is_ssl = false,
+                 user = "joe:arm",
+                 password = "erlang/otp"
+                },
+            fusco_lib:parse_url(
+                "http://joe%3aarm:erlang%2Fotp@host:180/foo/bar")),
 
         ?_assertEqual(#fusco_url{
                          host = "::1",
@@ -175,25 +180,28 @@ parse_url_test_() ->
                         },
                       fusco_lib:parse_url("http://[::1]:180/foo/bar")),
 
-        ?_assertEqual(#fusco_url{
-                         host = "::1",
-                         port = 180,
-                         path = "/foo/bar",
-                         is_ssl = false,
-                         user = "joe",
-                         password = "erlang"
-                        },
-                      fusco_lib:parse_url("http://joe:erlang@[::1]:180/foo/bar")),
+        ?_assertEqual(
+            #fusco_url{
+                 host = "::1",
+                 port = 180,
+                 path = "/foo/bar",
+                 is_ssl = false,
+                 user = "joe",
+                 password = "erlang"
+                },
+            fusco_lib:parse_url("http://joe:erlang@[::1]:180/foo/bar")),
 
-        ?_assertEqual(#fusco_url{
-                         host = "1080:0:0:0:8:800:200c:417a",
-                         port = 180,
-                         path = "/foo/bar",
-                         is_ssl = false,
-                         user = "joe",
-                         password = "erlang"
-                        },
-                      fusco_lib:parse_url("http://joe:erlang@[1080:0:0:0:8:800:200C:417A]:180/foo/bar")),
+        ?_assertEqual(
+            #fusco_url{
+                 host = "1080:0:0:0:8:800:200c:417a",
+                 port = 180,
+                 path = "/foo/bar",
+                 is_ssl = false,
+                 user = "joe",
+                 password = "erlang"
+                },
+            fusco_lib:parse_url(
+                "http://joe:erlang@[1080:0:0:0:8:800:200C:417A]:180/foo/bar")),
 
         ?_assertEqual(#fusco_url{
                          host = "www.example.com",

@@ -34,56 +34,55 @@ stop(Module, Listener, LS) ->
 
 acceptor(Module, ListenSocket, Responders) ->
     case accept(Module, ListenSocket) of
-	error ->
-	    ok;
-	Socket ->
-	    spawn_link(fun() ->
-			       acceptor(Module, ListenSocket, Responders)
-		       end),
-	    server_loop(Module, Socket, nil, [], Responders)
+        error ->
+            ok;
+        Socket ->
+            spawn_link(fun() -> acceptor(Module, ListenSocket, Responders) end),
+            server_loop(Module, Socket, nil, [], Responders)
     end.
 
 server_loop(Module, Socket, _, _, []) ->
     Module:close(Socket);
 server_loop(Module, Socket, Request, Headers, [H | T] = Responders) ->
     receive
-	stop ->
-	    Module:close(Socket)
+        stop ->
+            Module:close(Socket)
     after 0 ->
-	    case Module:recv(Socket, 0, 500) of
-		{ok, {http_request, _, _, _} = NewRequest} ->
-		    server_loop(Module, Socket, NewRequest, Headers, Responders);
-		{ok, {http_header, _, Field, _, Value}} when is_atom(Field) ->
-		    NewHeaders = [{atom_to_list(Field), Value} | Headers],
-		    server_loop(Module, Socket, Request, NewHeaders, Responders);
-		{ok, {http_header, _, Field, _, Value}} when is_list(Field) ->
-		    NewHeaders = [{Field, Value} | Headers],
-		    server_loop(Module, Socket, Request, NewHeaders, Responders);
-		{ok, http_eoh} ->
-		    RequestBody = case proplists:get_value("Content-Length", Headers) of
-				      undefined ->
-					  <<>>;
-				      "0" ->
-					  <<>>;
-				      SLength ->
-					  Length = list_to_integer(SLength),
-					  setopts(Module, Socket, [{packet, raw}]),
-					  {ok, Body} = Module:recv(Socket, Length),
-					  setopts(Module, Socket, [{packet, http}]),
-					  Body
-				  end,
-		    H(Module, Socket, Request, Headers, RequestBody),
-		    case proplists:get_value("Connection", Headers) of
-			"close" ->
-			    Module:close(Socket);
-			_ ->
-			    server_loop(Module, Socket, none, [], T)
-		    end;
-		{error, timeout} ->
-		    server_loop(Module, Socket, Request, Headers, Responders);
-		{error, closed} ->
-		    Module:close(Socket)
-	    end
+        case Module:recv(Socket, 0, 500) of
+            {ok, {http_request, _, _, _} = NewRequest} ->
+                server_loop(Module, Socket, NewRequest, Headers, Responders);
+            {ok, {http_header, _, Field, _, Value}} when is_atom(Field) ->
+                NewHeaders = [{atom_to_list(Field), Value} | Headers],
+                server_loop(Module, Socket, Request, NewHeaders, Responders);
+            {ok, {http_header, _, Field, _, Value}} when is_list(Field) ->
+                NewHeaders = [{Field, Value} | Headers],
+                server_loop(Module, Socket, Request, NewHeaders, Responders);
+            {ok, http_eoh} ->
+                RequestBody =
+                    case proplists:get_value("Content-Length", Headers) of
+                        undefined ->
+                            <<>>;
+                        "0" ->
+                            <<>>;
+                        SLength ->
+                            Length = list_to_integer(SLength),
+                            _ = setopts(Module, Socket, [{packet, raw}]),
+                            {ok, Body} = Module:recv(Socket, Length),
+                            _ = setopts(Module, Socket, [{packet, http}]),
+                            Body
+                    end,
+                H(Module, Socket, Request, Headers, RequestBody),
+                case proplists:get_value("Connection", Headers) of
+                    "close" ->
+                        Module:close(Socket);
+                    _ ->
+                        server_loop(Module, Socket, none, [], T)
+                end;
+            {error, timeout} ->
+                server_loop(Module, Socket, Request, Headers, Responders);
+            {error, closed} ->
+                Module:close(Socket)
+        end
     end.
 
 listen(ssl, Addr, Family) ->
@@ -121,18 +120,18 @@ get_addr(Host, Family) ->
 
 accept(ssl, ListenSocket) ->
     case ssl:transport_accept(ListenSocket, 1000000) of
-	{ok, Socket} ->
-	    ok = ssl:ssl_accept(Socket),
-	    Socket;
-	{error, _} ->
-	    error
+        {ok, Socket} ->
+            ok = ssl:ssl_accept(Socket),
+            Socket;
+        {error, _} ->
+            error
     end;
 accept(Module, ListenSocket) ->
     case Module:accept(ListenSocket, 100000) of
-	{ok, Socket} ->
-	    Socket;
-	{error, _} ->
-	    error
+        {ok, Socket} ->
+            Socket;
+        {error, _} ->
+            error
     end.
 
 setopts(ssl, Socket, Options) ->

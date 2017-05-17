@@ -12,10 +12,10 @@
 
 %exported functions
 -export([start/2,
-	 start_link/2,
-	 connect/1,
-	 request/6,
-	 request/7,
+         start_link/2,
+         connect/1,
+         request/6,
+         request/7,
          disconnect/1]).
 
 %% gen_server callbacks
@@ -26,8 +26,8 @@
          terminate/2,
          code_change/3]).
 
--include("fusco_types.hrl").
 -include("fusco.hrl").
+-include("fusco_types.hrl").
 
 -export_type([header/0,
               headers/0,
@@ -68,8 +68,10 @@
           out_timestamp,
           in_timestamp,
           on_connect,
-          recv_timeout = 'infinity' :: timeout() 
+          recv_timeout = 'infinity' :: timeout()
          }).
+
+-type client_state() :: #client_state{}.
 
 %%==============================================================================
 %% Exported functions
@@ -101,13 +103,15 @@ disconnect(Client) ->
 %% @doc Makes a request using a client already connected.
 %% @end
 %%------------------------------------------------------------------------------
--spec request(pid(), iodata(), method(), headers(), iodata(), pos_timeout()) -> result().
+-spec request(pid(), iodata(), method(), headers(), iodata(), pos_timeout()) ->
+    result().
 request(Client, Path, Method, Hdrs, Body, Timeout) ->
     request(Client, Path, Method, Hdrs, Body, 1, Timeout).
 
 
 %%------------------------------------------------------------------------------
-%% @spec (Client, Host, Method, Hdrs, RequestBody, RetryCount, Timeout) -> Result
+%% @spec (Client, Host, Method, Hdrs, RequestBody, RetryCount, Timeout) ->
+%%     Result
 %%   Host = string()
 %%   Method = string() | atom()
 %%   Hdrs = [{Header, Value}]
@@ -175,7 +179,7 @@ request(Client, Path, Method, Hdrs, Body, Timeout) ->
 %%
 %% `{send_retry, N}' specifies how many times the client should retry
 %% sending a request if the connection is closed after the data has been
-%% sent. The default value is `1'. 
+%% sent. The default value is `1'.
 %%
 %% `{proxy, ProxyUrl}' if this option is specified, a proxy server is used as
 %% an intermediary for all communication with the destination server. The link
@@ -187,9 +191,13 @@ request(Client, Path, Method, Hdrs, Body, Timeout) ->
 %% list of all available options, please check OTP's ssl module manpage.
 %% @end
 %%------------------------------------------------------------------------------
--spec request(pid(), iodata(), method(), headers(), iodata(), integer(), pos_timeout()) -> result().
-request(Client, Path, Method, Hdrs, Body, SendRetry, Timeout) when is_binary(Path) ->
-    gen_server:call(Client, {request, Path, Method, Hdrs, Body, SendRetry, Timeout}, infinity);
+-spec request(pid(), iodata(), method(), headers(), iodata(), integer(),
+              pos_timeout()) -> result().
+request(Client, Path, Method, Hdrs, Body, SendRetry,
+        Timeout) when is_binary(Path) ->
+    gen_server:call(Client,
+                    {request, Path, Method, Hdrs, Body, SendRetry, Timeout},
+                    infinity);
 request(_, _, _, _, _, _, _) ->
     {error, badarg}.
 
@@ -212,14 +220,14 @@ init({Destination, Options}) ->
             {H, P, S}
     end,
     Proxy = case ProxyInfo of
-		false ->
-		    undefined;
-		{proxy, ProxyUrl} when is_list(ProxyUrl), not Ssl ->
-		    %% The point of HTTP CONNECT proxying is to use TLS tunneled in
-		    %% a plain HTTP/1.1 connection to the proxy (RFC2817).
-		    throw(origin_server_not_https);
-		{proxy, ProxyUrl} when is_list(ProxyUrl) ->
-		    fusco_lib:parse_url(ProxyUrl)
+        false ->
+            undefined;
+        {proxy, ProxyUrl} when is_list(ProxyUrl), not Ssl ->
+            %% The point of HTTP CONNECT proxying is to use TLS tunneled in
+            %% a plain HTTP/1.1 connection to the proxy (RFC2817).
+            throw(origin_server_not_https);
+        {proxy, ProxyUrl} when is_list(ProxyUrl) ->
+            fusco_lib:parse_url(ProxyUrl)
     end,
     State = #client_state{host = Host, port = Port, ssl = Ssl,
                           connect_timeout = ConnectTimeout,
@@ -232,15 +240,16 @@ init({Destination, Options}) ->
     {ok, State}.
 
 %%------------------------------------------------------------------------------
-%% @doc This function fills in the Client record used in the requests and obtains
-%% the socket.
+%% @doc This function fills in the Client record used in the requests and
+%% obtains the socket.
 %% @end
 %%------------------------------------------------------------------------------
 handle_call(connect, _From, #client_state{socket = undefined} = State) ->
-    % if we dont get a keep alive from the previous request, the socket is undefined.
+    % if we dont get a keep alive from the previous request, the socket is
+    % undefined.
     case connect_socket(State) of
         {ok, NewState} ->
-	    {reply, ok, NewState};
+            {reply, ok, NewState};
         {Error, NewState} ->
             {reply, Error, NewState}
     end;
@@ -251,13 +260,13 @@ handle_call({request, Path, Method, Hdrs, Body, SendRetry, Timeout}, From,
                                   use_cookies = UseCookies}) ->
     Cookies = delete_expired_cookies(State),
     {Request, ConHeader} =
-	fusco_lib:format_request(Path, Method, Hdrs, Host, Body, {UseCookies, Cookies}),
-    send_request(State#client_state{
-		   request = Request,
-		   requester = From,
-		   connection_header = ConHeader,
-		   attempts = SendRetry + 1,
-           recv_timeout = Timeout}).
+    fusco_lib:format_request(Path, Method, Hdrs, Host, Body,
+                             {UseCookies, Cookies}),
+    send_request(State#client_state{ request = Request,
+                                     requester = From,
+                                     connection_header = ConHeader,
+                                     attempts = SendRetry + 1,
+                                     recv_timeout = Timeout}).
 
 %%--------------------------------------------------------------------
 %% @private
@@ -303,8 +312,8 @@ terminate(_Reason, #client_state{socket = Socket, ssl = Ssl}) ->
         undefined ->
             ok;
         _ ->
-	    fusco_sock:close(Socket, Ssl),
-	    ok
+            _ = fusco_sock:close(Socket, Ssl),
+            ok
     end.
 
 %%--------------------------------------------------------------------
@@ -330,7 +339,8 @@ code_change(_OldVsn, State, _Extra) ->
 send_request(#client_state{attempts = 0} = State) ->
     {reply, {error, connection_closed}, State};
 send_request(#client_state{socket = undefined} = State) ->
-    % if we dont get a keep alive from the previous request, the socket is undefined.
+    % if we dont get a keep alive from the previous request, the socket is
+    % undefined.
     case connect_socket(State) of
         {ok, NewState} ->
             send_request(NewState);
@@ -338,19 +348,25 @@ send_request(#client_state{socket = undefined} = State) ->
             {reply, Error, NewState}
     end;
 send_request(#client_state{socket = Socket, ssl = Ssl, request = Request,
-                           attempts = Attempts, recv_timeout = RecvTimeout} = State) ->
+                           attempts = Attempts, recv_timeout = RecvTimeout
+                          } = State) ->
     Out = os:timestamp(),
     %If we have a timeout set then we need to ensure a timeout on sending too
-    fusco_sock:setopts(Socket, [{send_timeout, RecvTimeout}, {send_timeout_close, true}], Ssl),
+    _ = fusco_sock:setopts(Socket, [{send_timeout, RecvTimeout},
+                                    {send_timeout_close, true}], Ssl),
     case fusco_sock:send(Socket, Request, Ssl) of
         ok ->
-	        read_response(State#client_state{out_timestamp = Out});
+            read_response(State#client_state{out_timestamp = Out});
         {error, closed} ->
-            fusco_sock:close(Socket, Ssl),
-            send_request(State#client_state{socket = undefined, attempts = Attempts - 1});
+            _ = fusco_sock:close(Socket, Ssl),
+            send_request(State#client_state{socket = undefined,
+                                            attempts = Attempts - 1});
         {error, _Reason} ->
-            fusco_sock:close(Socket, Ssl),
-            {reply, {error, connection_closed}, State#client_state{socket = undefined}}
+            _ = fusco_sock:close(Socket, Ssl),
+            { reply,
+              {error, connection_closed},
+              State#client_state{socket = undefined}
+            }
     end.
 
 %%------------------------------------------------------------------------------
@@ -364,11 +380,12 @@ request_first_destination(#client_state{host = Host, port = Port, ssl = Ssl}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-read_proxy_connect_response(#client_state{recv_timeout = RecvTimeout} = State) ->
+read_proxy_connect_response(#client_state{recv_timeout = RecvTimeout
+                                         } = State) ->
     Socket = State#client_state.socket,
     ProxyIsSsl = (State#client_state.proxy)#fusco_url.is_ssl,
     case fusco_protocol:recv(Socket, ProxyIsSsl, RecvTimeout) of
-	#response{status_code = <<$1,_,_>>} ->
+        #response{status_code = <<$1,_,_>>} ->
             %% RFC 2616, section 10.1:
             %% A client MUST be prepared to accept one or more
             %% 1xx status responses prior to a regular
@@ -376,22 +393,23 @@ read_proxy_connect_response(#client_state{recv_timeout = RecvTimeout} = State) -
             %% 100 (Continue) status message. Unexpected 1xx
             %% status responses MAY be ignored by a user agent.
             read_proxy_connect_response(State);
-	#response{status_code = <<$2,_,_>>} ->
+        #response{status_code = <<$2,_,_>>} ->
             %% RFC2817, any 2xx code means success.
             ConnectOptions = State#client_state.connect_options,
             SslOptions = State#client_state.proxy_ssl_options,
             Timeout = State#client_state.connect_timeout,
             case ssl:connect(Socket, SslOptions ++ ConnectOptions, Timeout) of
-		{ok, SslSocket} ->
-		    {ok, SslSocket};
-		{error, Reason} ->
-		    fusco_sock:close(State#client_state.socket, State#client_state.ssl),
-		    {error, {proxy_connection_failed, Reason}}
-	    end;
+                {ok, SslSocket} ->
+                    {ok, SslSocket};
+                {error, Reason} ->
+                    _ = fusco_sock:close(State#client_state.socket,
+                                         State#client_state.ssl),
+                    {error, {proxy_connection_failed, Reason}}
+            end;
         #response{status_code = StatusCode, reason = Reason} ->
             {error, {proxy_connection_refused, StatusCode, Reason}};
         {error, closed} ->
-            fusco_sock:close(Socket, ProxyIsSsl),
+            _ = fusco_sock:close(Socket, ProxyIsSsl),
             {error, proxy_connection_closed};
         {error, Reason} ->
             {error, {proxy_connection_failed, Reason}}
@@ -402,89 +420,98 @@ read_proxy_connect_response(#client_state{recv_timeout = RecvTimeout} = State) -
 %% @doc @TODO This does not handle redirects at the moment.
 %% @end
 %%------------------------------------------------------------------------------
--spec read_response(#client_state{}) -> {any(), socket()} | no_return().
-read_response(#client_state{socket = Socket, ssl = Ssl, use_cookies = UseCookies,
+-spec read_response(client_state()) -> {any(), socket()} | no_return().
+read_response(#client_state{socket = Socket, ssl = Ssl,
+                            use_cookies = UseCookies,
                             connection_header = ConHdr, cookies = Cookies,
-			    requester = From, out_timestamp = Out, attempts = Attempts,
-                recv_timeout = RecvTimeout} = State) ->
+                            requester = From, out_timestamp = Out,
+                            attempts = Attempts,
+                            recv_timeout = RecvTimeout} = State) ->
     case fusco_protocol:recv(Socket, Ssl, RecvTimeout) of
-	#response{status_code = <<$1,_,_>>} ->
-	    %% RFC 2616, section 10.1:
+        #response{status_code = <<$1,_,_>>} ->
+            %% RFC 2616, section 10.1:
             %% A client MUST be prepared to accept one or more
             %% 1xx status responses prior to a regular
             %% response, even if the client does not expect a
             %% 100 (Continue) status message. Unexpected 1xx
             %% status responses MAY be ignored by a user agent.
             read_response(State);
-	#response{version = Vsn, cookies = NewCookies, connection = Connection,
-		  status_code = Status, reason = Reason, headers = Headers,
-		  body = Body, size = Size, in_timestamp = In}->
-	    gen_server:reply(
-	      From,
-	      {ok, {{Status, Reason}, Headers, Body, Size,
-		    timer:now_diff(In, Out)}}),
-	    case maybe_close_socket(Connection, State, Vsn, ConHdr) of
-		undefined ->
-		    case UseCookies of
-			true ->
-                    {noreply, State#client_state{socket = undefined,
-                                                 cookies = fusco_lib:update_cookies(NewCookies, Cookies),
-                                                 in_timestamp = In}};
-			false ->
-			    {noreply, State#client_state{socket = undefined}}
-		    end;
-		_ ->
-		    case UseCookies of
-			true ->
-			    {noreply, State#client_state{cookies = fusco_lib:update_cookies(NewCookies, Cookies),
-                                             in_timestamp = In}};
-			_ ->
-			    {noreply, State}
-		    end
-	    end;
-	{error, closed} ->
+        #response{version = Vsn, cookies = NewCookies, connection = Connection,
+                  status_code = Status, reason = Reason, headers = Headers,
+                  body = Body, size = Size, in_timestamp = In}->
+            gen_server:reply(From, {ok, {{Status, Reason}, Headers, Body, Size,
+                timer:now_diff(In, Out)}}),
+            case maybe_close_socket(Connection, State, Vsn, ConHdr) of
+                undefined ->
+                    maybe_use_cookie_with_conn(UseCookies, State, NewCookies,
+                                               Cookies, In);
+                _ ->
+                    maybe_use_cookie_without_conn(UseCookies, State, NewCookies,
+                                                  Cookies, In)
+            end;
+        {error, closed} ->
             % Either we only noticed that the socket was closed after we
             % sent the request, the server closed it just after we put
             % the request on the wire or the server has some isses and is
             % closing connections without sending responses.
             % If this the first attempt to send the request, we will try again.
-            fusco_sock:close(Socket, Ssl),
-            send_request(State#client_state{socket = undefined, attempts = Attempts - 1});
-	{error, Reason} ->
-	    fusco_sock:close(Socket, Ssl),
-	    {reply, {error, Reason}, State#client_state{socket = undefined}}
+            _ = fusco_sock:close(Socket, Ssl),
+            send_request(State#client_state{socket = undefined,
+                                            attempts = Attempts - 1});
+        {error, Reason} ->
+            _ = fusco_sock:close(Socket, Ssl),
+            {reply, {error, Reason}, State#client_state{socket = undefined}}
     end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-maybe_close_socket(<<"close">>, #client_state{socket = Socket} = State, {1, 1}, _) ->
-    fusco_sock:close(Socket, State#client_state.ssl),
+maybe_use_cookie_with_conn(true, State, NewCookies, Cookies, In) ->
+    { noreply,
+      State#client_state{
+         socket = undefined,
+         cookies = fusco_lib:update_cookies(NewCookies, Cookies),
+         in_timestamp = In
+      }
+    };
+maybe_use_cookie_with_conn(false, State, _, _, _) ->
+    {noreply, State#client_state{socket = undefined}}.
+
+maybe_use_cookie_without_conn(true, State, NewCookies, Cookies, In) ->
+    { noreply,
+      State#client_state{
+          cookies = fusco_lib:update_cookies(NewCookies, Cookies),
+          in_timestamp = In
+    }};
+maybe_use_cookie_without_conn(_, State, _, _, _) ->
+    {noreply, State}.
+
+maybe_close_socket(<<"close">>, #client_state{socket = Socket} = State,
+                   {1, 1}, _) ->
+    _ = fusco_sock:close(Socket, State#client_state.ssl),
     undefined;
 maybe_close_socket(_, #client_state{socket = Socket}, {1, 1}, undefined) ->
     Socket;
 maybe_close_socket(_, #client_state{socket = Socket} = State, {1, 1}, ConHdr) ->
-    ClientConnection = fusco_lib:is_close(ConHdr),
-    if
-        ClientConnection ->
-            fusco_sock:close(Socket, State#client_state.ssl),
+    case fusco_lib:is_close(ConHdr) of
+        true ->
+            _ = fusco_sock:close(Socket, State#client_state.ssl),
             undefined;
-        (not ClientConnection) ->
+        false ->
             Socket
     end;
-maybe_close_socket(<<"keep-alive">>, #client_state{socket = Socket}, _, undefined) ->
-    Socket;
+maybe_close_socket(<<"keep-alive">>, #client_state{socket = Socket}, _,
+                   undefined) -> Socket;
 maybe_close_socket(C, #client_state{socket = Socket} = State, _, _)
   when C =/= <<"keep-alive">> ->
-    fusco_sock:close(Socket, State#client_state.ssl),
+    _ = fusco_sock:close(Socket, State#client_state.ssl),
     undefined;
 maybe_close_socket(_, #client_state{socket = Socket} = State, _, ConHdr) ->
-    ClientConnection = fusco_lib:is_close(ConHdr),
-    if
-        ClientConnection ->
-            fusco_sock:close(Socket, State#client_state.ssl),
+    case fusco_lib:is_close(ConHdr) of
+        true ->
+            _ = fusco_sock:close(Socket, State#client_state.ssl),
             undefined;
-        (not ClientConnection) ->
+        false ->
             Socket
     end.
 
@@ -504,14 +531,15 @@ is_ipv6_host(Host) ->
                 {ok, _} ->
                     false;
                 _ ->
-                    case inet:getaddr(Host, inet6) of
-                        {ok, _} ->
-                            true;
-                        _ ->
-                            false
-                    end
+                    is_ok_response(inet:getaddr(Host, inet6))
             end
     end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+is_ok_response({ok, _}) -> true;
+is_ok_response(_) -> false.
 
 % What about the timeout?
 %%------------------------------------------------------------------------------
@@ -521,10 +549,10 @@ is_ipv6_host(Host) ->
 %%------------------------------------------------------------------------------
 connect_socket(State) ->
     case ensure_proxy_tunnel(new_socket(State), State) of
-	{ok, Socket} ->
-	    {ok, State#client_state{socket = Socket}};
-	Error ->
-	    {Error, State}
+        {ok, Socket} ->
+            {ok, State#client_state{socket = Socket}};
+        Error ->
+            {Error, State}
     end.
 
 %%------------------------------------------------------------------------------
@@ -532,7 +560,8 @@ connect_socket(State) ->
 %% @doc Creates a new socket using the options included in the client state.
 %% end
 %%------------------------------------------------------------------------------
-new_socket(#client_state{connect_timeout = Timeout, connect_options = ConnectOptions,
+new_socket(#client_state{connect_timeout = Timeout,
+                         connect_options = ConnectOptions,
                          on_connect = OnConnectFun} = State) ->
     {Host, Port, Ssl} = request_first_destination(State),
     ConnectOptions2 = case (not lists:member(inet, ConnectOptions)) andalso
@@ -581,33 +610,34 @@ connect(Host, Port, SocketOptions, Timeout, Ssl) ->
 
 ensure_proxy_tunnel({error, _} = Error, _State) ->
     Error;
-ensure_proxy_tunnel({ok, Socket}, #client_state{proxy = #fusco_url{user = User,
-							     password = Passwd,
-							     is_ssl = Ssl},
-					  host = DestHost, port = Port} = State) ->
+ensure_proxy_tunnel({ok, Socket},
+                    #client_state{proxy = #fusco_url{user = User,
+                                                     password = Passwd,
+                                                     is_ssl = Ssl},
+                                  host = DestHost, port = Port} = State) ->
     %% Proxy tunnel connection http://tools.ietf.org/html/rfc2817#section-5.2
-    %% Draft http://www.web-cache.com/Writings/Internet-Drafts/draft-luotonen-web-proxy-tunneling-01.txt
+    %% Draft http://www.web-cache.com/Writings/Internet-Drafts/
+    %%       draft-luotonen-web-proxy-tunneling-01.txt
     %% IPv6 address literals are enclosed by square brackets (RFC2732)
     Host = [fusco_lib:maybe_ipv6_enclose(DestHost), $:, integer_to_list(Port)],
     ConnectRequest = [
-		      <<"CONNECT ">>, Host, <<" HTTP/1.1">>, ?HTTP_LINE_END,
-		      <<"Host: ">>, Host, ?HTTP_LINE_END,
-		      case User of
-			  [] ->
-			      [];
-			  _ ->
-			      [<<"Proxy-Authorization: Basic ">>,
-			       base64:encode(User ++ ":" ++ Passwd), ?HTTP_LINE_END]
-		      end,
-            ?HTTP_LINE_END],
+        <<"CONNECT ">>, Host, <<" HTTP/1.1">>, ?HTTP_LINE_END, <<"Host: ">>,
+        Host, ?HTTP_LINE_END,
+        case User of
+            [] ->
+                [];
+            _ ->
+                [<<"Proxy-Authorization: Basic ">>,
+                 base64:encode(User ++ ":" ++ Passwd), ?HTTP_LINE_END]
+        end, ?HTTP_LINE_END],
     case fusco_sock:send(Socket, ConnectRequest, Ssl) of
         ok ->
             read_proxy_connect_response(State#client_state{socket = Socket});
         {error, closed} ->
-            fusco_sock:close(Socket, Ssl),
+            _ = fusco_sock:close(Socket, Ssl),
             {error, proxy_connection_closed};
         {error, _Reason} ->
-            fusco_sock:close(Socket, Ssl),
+            _ = fusco_sock:close(Socket, Ssl),
             {error, proxy_connection_closed}
     end;
 ensure_proxy_tunnel(Socket, _State) ->
