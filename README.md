@@ -82,6 +82,12 @@ response is received.
 `{send_retry, N}` specifies how many times the client should retry
 sending a request if the connection is closed after the data has been
 sent. The default value is 1.
+
+`{http_auth, Configuration}` specifies the HTTP authentication scheme.
+`Configuration` is a tuple of the form `{Mode, {Username, Password}}`.
+Right now, `Mode` can be `digest`. `Username` and `Password` are binary data.
+For example, to use digest auth with credentials `username:password` you'd
+pass along the tuple `{digest, {<<"username">>, <<"password">>}}`.
  
 `{proxy, ProxyUrl}` if this option is specified, a proxy server is used as
 an intermediary for all communication with the destination server. The link

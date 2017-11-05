@@ -34,29 +34,43 @@
 }).
 
 -record(fusco_cookie, {
-          name :: binary(),
-          value :: binary(),
-          expires :: {{integer(), integer(), integer()},
-                      {integer(), integer(), integer()}} | atom(),
-          path :: binary() | undefined,
-          path_tokens :: [binary()] | undefined,
-          max_age :: integer() | atom(),
-          domain :: binary() | undefined
-         }).
+    name :: binary(),
+    value :: binary(),
+    expires :: {{integer(), integer(), integer()},
+                {integer(), integer(), integer()}} | atom(),
+    path :: binary() | undefined,
+    path_tokens :: [binary()] | undefined,
+    max_age :: integer() | atom(),
+    domain :: binary() | undefined
+}).
+
+% HTTP digest
+-record(fusco_digest, {
+    username :: binary(),
+    password :: binary(),
+    realm :: undefined | binary(),
+    domains :: undefined | [binary()],
+    nonce :: undefined | binary(),
+    opaque :: undefined | binary(),
+    userhash :: undefined | boolean(),
+    qop :: undefined | auth | 'auth-int',
+    nc = 0 :: non_neg_integer()
+}).
 
 -record(response, {socket,
-		   ssl,
-		   version,
-		   status_code,
-		   reason,
-		   headers = [],
-		   connection,
-		   cookies = [],
-		   content_length = 0,
-		   size,
-		   in_timestamp,
-		   transfer_encoding,
-		   body}).
+    ssl,
+    version,
+    status_code,
+    reason,
+    headers = [],
+    connection,
+    cookies = [],
+    content_length = 0,
+    size,
+    in_timestamp,
+    transfer_encoding,
+    body
+}).
 
 -ifdef(no_binary_to_integer).
 

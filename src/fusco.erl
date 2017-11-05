@@ -59,6 +59,7 @@
           requester,
           cookies = [] :: [#fusco_cookie{}],
           use_cookies = false :: boolean(),
+          http_auth :: undefined | {digest, #fusco_digest{}},
           %% in case of infinity we read whatever data we can get from
           %% the wire at that point
           attempts = 0 :: integer(),
@@ -208,6 +209,7 @@ init({Destination, Options}) ->
     ConnectTimeout = fusco_lib:get_value(connect_timeout, Options, infinity),
     ConnectOptions = fusco_lib:get_value(connect_options, Options, []),
     UseCookies = fusco_lib:get_value(use_cookies, Options, false),
+    HttpAuth = fusco_lib:get_value(http_auth, Options),
     ProxyInfo = fusco_lib:get_value(proxy, Options, false),
     ProxySsl = fusco_lib:get_value(proxy_ssl_options, Options, []),
     OnConnectFun = fusco_lib:get_value(on_connect, Options, fun(_) -> ok end),
@@ -229,11 +231,20 @@ init({Destination, Options}) ->
         {proxy, ProxyUrl} when is_list(ProxyUrl) ->
             fusco_lib:parse_url(ProxyUrl)
     end,
+    Digest = case HttpAuth of
+      {digest, {Username, Password}} ->
+        {digest, #fusco_digest{
+          username = Username,
+          password = Password
+        }};
+      _ -> undefined
+    end,
     State = #client_state{host = Host, port = Port, ssl = Ssl,
                           connect_timeout = ConnectTimeout,
                           connect_options = ConnectOptions,
                           use_cookies = UseCookies,
                           host_header = fusco_lib:host_header(Host, Port),
+                          http_auth = Digest,
                           proxy = Proxy,
                           proxy_ssl_options = ProxySsl,
                           on_connect = OnConnectFun},
@@ -422,12 +433,10 @@ read_proxy_connect_response(#client_state{recv_timeout = RecvTimeout
 %%------------------------------------------------------------------------------
 -spec read_response(client_state()) -> {any(), socket()} | no_return().
 read_response(#client_state{socket = Socket, ssl = Ssl,
-                            use_cookies = UseCookies,
-                            connection_header = ConHdr, cookies = Cookies,
-                            requester = From, out_timestamp = Out,
                             attempts = Attempts,
                             recv_timeout = RecvTimeout} = State) ->
-    case fusco_protocol:recv(Socket, Ssl, RecvTimeout) of
+    Response = fusco_protocol:recv(Socket, Ssl, RecvTimeout),
+    case Response of
         #response{status_code = <<$1,_,_>>} ->
             %% RFC 2616, section 10.1:
             %% A client MUST be prepared to accept one or more
@@ -436,19 +445,10 @@ read_response(#client_state{socket = Socket, ssl = Ssl,
             %% 100 (Continue) status message. Unexpected 1xx
             %% status responses MAY be ignored by a user agent.
             read_response(State);
-        #response{version = Vsn, cookies = NewCookies, connection = Connection,
-                  status_code = Status, reason = Reason, headers = Headers,
-                  body = Body, size = Size, in_timestamp = In}->
-            gen_server:reply(From, {ok, {{Status, Reason}, Headers, Body, Size,
-                timer:now_diff(In, Out)}}),
-            case maybe_close_socket(Connection, State, Vsn, ConHdr) of
-                undefined ->
-                    maybe_use_cookie_with_conn(UseCookies, State, NewCookies,
-                                               Cookies, In);
-                _ ->
-                    maybe_use_cookie_without_conn(UseCookies, State, NewCookies,
-                                                  Cookies, In)
-            end;
+        #response{status_code = <<$4,$0,$1>>, headers = Headers} ->
+            %% we got an Unauthorized response, let's try to authorize the request
+            DigestSpecs = fusco_lib:header_values(<<"www-authenticate">>, Headers),
+            maybe_authorize_request(Response, State, DigestSpecs);
         {error, closed} ->
             % Either we only noticed that the socket was closed after we
             % sent the request, the server closed it just after we put
@@ -460,12 +460,45 @@ read_response(#client_state{socket = Socket, ssl = Ssl,
                                             attempts = Attempts - 1});
         {error, Reason} ->
             _ = fusco_sock:close(Socket, Ssl),
-            {reply, {error, Reason}, State#client_state{socket = undefined}}
+            {reply, {error, Reason}, State#client_state{socket = undefined}};
+        _ ->
+          return_response(Response, State)
     end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+return_response(#response{version = Vsn, cookies = NewCookies, connection = Connection,
+                    status_code = Status, reason = Reason, headers = Headers,
+                    body = Body, size = Size, in_timestamp = In}, 
+                #client_state{requester = From, out_timestamp = Out, connection_header = ConHdr,
+                    use_cookies = UseCookies, cookies = Cookies} = State) ->
+    gen_server:reply(From, {ok, {{Status, Reason}, Headers, Body, Size,
+      timer:now_diff(In, Out)}}),
+    case maybe_close_socket(Connection, State, Vsn, ConHdr) of
+      undefined ->
+          maybe_use_cookie_with_conn(UseCookies, State, NewCookies,
+                                     Cookies, In);
+      _ ->
+          maybe_use_cookie_without_conn(UseCookies, State, NewCookies,
+                                        Cookies, In)
+    end.
+
+maybe_authorize_request(Response, State, []) ->
+    %% no auth spec in headers, so nothing we can do.
+    return_response(Response, State);
+maybe_authorize_request(Response, State, Headers) ->
+    %% todo finish this
+    return_response(Response, State).
+    %% parse and build list of digest specs
+
+    %% RFC 7616, section 5.6:
+    %% choose the strongest digest that we support
+
+    %% generate auth header with digest spec
+
+    %% reissue request with auth header, +1 cnonce
+
 maybe_use_cookie_with_conn(true, State, NewCookies, Cookies, In) ->
     { noreply,
       State#client_state{
@@ -661,6 +694,9 @@ verify_options([{proxy_ssl_options, List} | Options]) when is_list(List) ->
 verify_options([{use_cookies, B} | Options]) when is_boolean(B) ->
     verify_options(Options);
 verify_options([{on_connect, F} | Options]) when is_function(F) ->
+    verify_options(Options);
+verify_options([{http_auth, {digest, {Username, Password}}} | Options]) 
+                  when is_binary(Username) andalso is_binary(Password) ->
     verify_options(Options);
 verify_options([Option | _Rest]) ->
     erlang:error({bad_option, Option});

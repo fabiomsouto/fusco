@@ -13,6 +13,7 @@
 -export([parse_url/1,
          format_request/6,
          header_value/2,
+         header_values/2,
          update_cookies/2,
          delete_expired_cookies/2,
          to_lower/1,
@@ -29,6 +30,7 @@
 
 -type fusco_url() :: #fusco_url{}.
 -type fusco_cookie() :: #fusco_cookie{}.
+-type fusco_digest() :: #fusco_digest{}.
 
 %%==============================================================================
 %% Exported functions
@@ -54,6 +56,30 @@ header_value(Hdr, Hdrs) ->
         {Hdr, Value} ->
             Value
     end.
+
+%%------------------------------------------------------------------------------
+%% @spec header_values(Header, Headers) -> [term()]
+%% Header = string()
+%% Headers = [{header(), term()}]
+%% Value = [term()]
+%% @doc
+%% Returns the values associated with the `Header' in `Headers'.
+%% `Header' must be a lowercase string, since every header is mangled to
+%% check the match.
+%% @end
+%%------------------------------------------------------------------------------
+-spec header_values(string() | binary(), headers()) -> [term()].
+header_values(Hdr, Hdrs) ->
+    %% TODO ensure headers and values are stripped
+    lists:filtermap(fun({H, V}) ->
+        case H =:= Hdr of
+            true ->
+                {true, V};
+            false ->
+                false
+        end
+    end,
+    Hdrs).
 
 %%------------------------------------------------------------------------------
 %% @spec (URL) -> fusco_url()
